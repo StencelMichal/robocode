@@ -5,6 +5,13 @@ plugins {
 
 dependencies {
     implementation(project(":robocode.api"))
+    implementation(files("../jFuzzyLogic-1.2.1.jar"))
+}
+
+repositories{
+    maven {
+        url = uri("https://repository.ow2.org/nexus/content/repositories/public/")
+    }
 }
 
 description = "Robocode Samples"

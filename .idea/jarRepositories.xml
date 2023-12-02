@@ -26,5 +26,10 @@
       <option name="name" value="MavenLocal" />
       <option name="url" value="file:/$MAVEN_REPOSITORY$/" />
     </remote-repository>
+    <remote-repository>
+      <option name="id" value="maven3" />
+      <option name="name" value="maven3" />
+      <option name="url" value="https://repository.ow2.org/nexus/content/repositories/public/" />
+    </remote-repository>
   </component>
 </project>
