@@ -1,0 +1,38 @@
+FUNCTION_BLOCK shootingControl
+VAR_INPUT
+    direction : REAL;    // Kierunek jazdy celu
+    velocity : REAL;     // Prędkość jazdy celu
+    distance : REAL;     // Dystans do celu
+END_VAR
+
+VAR_OUTPUT
+    shootingDirection : REAL;   // Kierunek strzału
+END_VAR
+
+FUZZIFY direction
+    TERM low NEGATIVE_SLOPE(0, 20)
+    TERM medium TRIANGLE(15, 25, 35)
+    TERM high POSITIVE_SLOPE(30, 40)
+
+FUZZIFY velocity
+    TERM slow NEGATIVE_SLOPE(0, 10)
+    TERM moderate TRIANGLE(5, 15, 25)
+    TERM fast POSITIVE_SLOPE(20, 30)
+
+FUZZIFY distance
+    TERM close NEGATIVE_SLOPE(0, 100)
+    TERM medium TRIANGLE(50, 150, 250)
+    TERM far POSITIVE_SLOPE(200, 300)
+
+DEFUZZIFY shootingDirection
+    TERM left NEGATIVE_SLOPE(-10, 0)
+    TERM center TRIANGLE(-5, 0, 5)
+    TERM right POSITIVE_SLOPE(0, 10)
+
+RULEBLOCK rules
+    RULE 1 : IF direction IS low AND velocity IS slow AND distance IS close THEN shootingDirection IS right
+    RULE 2 : IF direction IS medium AND velocity IS moderate AND distance IS medium THEN shootingDirection IS center
+    RULE 3 : IF direction IS high AND velocity IS fast AND distance IS far THEN shootingDirection IS left
+END_RULEBLOCK
+
+END_FUNCTION_BLOCK
