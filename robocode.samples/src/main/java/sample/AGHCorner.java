@@ -9,6 +9,7 @@ package sample;
 
 
 import com.fuzzylite.Engine;
+import com.fuzzylite.FuzzyLite;
 import com.fuzzylite.activation.General;
 import com.fuzzylite.activation.Highest;
 import com.fuzzylite.activation.Lowest;
@@ -26,10 +27,12 @@ import com.fuzzylite.variable.InputVariable;
 import com.fuzzylite.variable.OutputVariable;
 import robocode.AdvancedRobot;
 import robocode.DeathEvent;
+import robocode.Rules;
 import robocode.ScannedRobotEvent;
 
 import java.awt.*;
 
+import static java.lang.Double.NaN;
 import static robocode.util.Utils.normalRelativeAngleDegrees;
 
 /**
@@ -56,6 +59,7 @@ public class AGHCorner extends AdvancedRobot {
 	private OutputVariable shootDirection;
 
 	private void initializeFuzzyLogic(){
+		FuzzyLite.setDebugging(true);
 		// Inicjalizacja silnika rozmytego
 		engine = new Engine();
 		engine.setName("ShootingDirection");
@@ -64,7 +68,7 @@ public class AGHCorner extends AdvancedRobot {
 		movingDirection = new InputVariable();
 		movingDirection.setName("movingDirection");
 		movingDirection.setEnabled(true);
-		movingDirection.setRange(0.0, 360.0);
+		movingDirection.setRange(-45.0, 315.0);
 		movingDirection.addTerm(new Triangle("movingLeft", -45, 135));
 		movingDirection.addTerm(new Triangle("movingRight", 135, 315));
 		engine.addInputVariable(movingDirection);
@@ -73,18 +77,18 @@ public class AGHCorner extends AdvancedRobot {
 		speed = new InputVariable();
 		speed.setName("speed");
 		speed.setEnabled(true);
-		speed.setRange(0.0, 8.0);
-		speed.addTerm(new Ramp("movingSlow", 0, 8.0));
-		speed.addTerm(new Ramp("movingFast", 8.0, 0));
-//		engine.addInputVariable(speed);
+		speed.setRange(0, Rules.MAX_VELOCITY);
+		speed.addTerm(new Ramp("movingSlow", 0, Rules.MAX_VELOCITY / 2 + 2 ));
+		speed.addTerm(new Ramp("movingFast", Rules.MAX_VELOCITY / 2 - 2, Rules.MAX_VELOCITY));
+		engine.addInputVariable(speed);
 
 		distance = new InputVariable();
 		distance.setName("distance");
 		distance.setEnabled(true);
 		distance.setRange(0.0, 1000.0);
-		distance.addTerm(new Ramp("far", 0.0, 1000.0));
-		distance.addTerm(new Ramp("close", 1000.0, 0));
-//		engine.addInputVariable(distance);
+		distance.addTerm(new Ramp("far", 200, 1000.0)); // TODO być może 1000 - 200 itp itd
+		distance.addTerm(new Ramp("close", 0, 400));
+		engine.addInputVariable(distance);
 
 		shootDirection = new OutputVariable();
 		shootDirection.setEnabled(true);
@@ -92,8 +96,10 @@ public class AGHCorner extends AdvancedRobot {
 		shootDirection.setRange(-45.0, 45.0);
 		shootDirection.fuzzyOutput().setAggregation(new DrasticSum());
 		shootDirection.setDefuzzifier(new Centroid(90));
-		shootDirection.addTerm(new Ramp("shootRight", 45.0, 0));
-		shootDirection.addTerm(new Ramp("shootLeft", -45.0, 0));
+		shootDirection.addTerm(new Ramp("shootFarRight", 45.0, 10));
+		shootDirection.addTerm(new Ramp("shootRight", 25.0, 0));
+		shootDirection.addTerm(new Ramp("shootLeft", -25.0, 0));
+		shootDirection.addTerm(new Ramp("shootFarLeft", -45.0, -10.0));
 
 //		hargaLele.setEnabled(true);
 //		hargaLele.setRange(100000,1500000);
@@ -109,18 +115,27 @@ public class AGHCorner extends AdvancedRobot {
 		// Zasady
 		RuleBlock ruleBlock = new RuleBlock();
 		ruleBlock.setEnabled(true);
-		ruleBlock.setConjunction(null);
+		ruleBlock.setConjunction(new Minimum());
 		ruleBlock.setDisjunction(null);
 		ruleBlock.setImplication(new AlgebraicProduct());
 		ruleBlock.setActivation(new General());
-		ruleBlock.addRule(Rule.parse("if movingDirection is movingLeft then shootDirection is shootLeft", engine));
 
-		ruleBlock.addRule(Rule.parse("if movingDirection is movingRight then shootDirection is shootRight", engine));
-//		ruleBlock.addRule(Rule.parse("if movingDirection is movingRight and speed is movingFast and distance is far then shootDirection is shootRight", engine));
-//		ruleBlock.addRule(Rule.parse("if movingDirection is movingLeft and speed is movingFast and distance is far then shootDirection is shootLeft", engine));
-//		ruleBlock.addRule(Rule.parse("if movingDirection is movingRight and speed is movingSlow and distance is close then shootDirection is shootRight", engine));
-//		ruleBlock.addRule(Rule.parse("if movingDirection is movingRight and speed is movingFast and distance is close then shootDirection is shootRight", engine));
-//		ruleBlock.addRule(Rule.parse("if true then shootDirection is shootDefault", engine));
+		ruleBlock.addRule(Rule.parse("if movingDirection is movingLeft and speed is movingSlow and distance is far then shootDirection is shootFarLeft", engine));
+		ruleBlock.addRule(Rule.parse("if movingDirection is movingLeft and speed is movingSlow and distance is close then shootDirection is shootLeft", engine));
+		ruleBlock.addRule(Rule.parse("if movingDirection is movingLeft and speed is movingFast and distance is far then shootDirection is shootFarLeft", engine));
+		ruleBlock.addRule(Rule.parse("if movingDirection is movingLeft and speed is movingFast and distance is close then shootDirection is shootLeft", engine));
+
+		ruleBlock.addRule(Rule.parse("if movingDirection is movingRight and speed is movingSlow and distance is far then shootDirection is shootFarRight", engine));
+		ruleBlock.addRule(Rule.parse("if movingDirection is movingRight and speed is movingSlow and distance is close then shootDirection is shootRight", engine));
+		ruleBlock.addRule(Rule.parse("if movingDirection is movingRight and speed is movingFast and distance is far then shootDirection is shootFarRight", engine));
+		ruleBlock.addRule(Rule.parse("if movingDirection is movingRight and speed is movingFast and distance is close then shootDirection is shootRight", engine));
+
+//		ruleBlock.addRule(Rule.parse("if movingDirection is movingLeft and speed is movingSlow and distance is close then shootDirection is shootFarLeft", engine));
+//		ruleBlock.addRule(Rule.parse("if movingDirection is movingLeft and speed is movingFast and distance is close then shootDirection is shootFarLeft", engine));
+//
+//		ruleBlock.addRule(Rule.parse("if movingDirection is movingRight and speed is movingSlow and distance is close then shootDirection is shootFarRight", engine));
+//		ruleBlock.addRule(Rule.parse("if movingDirection is movingRight and speed is movingFast and distance is close then shootDirection is shootFarRight", engine));
+
 
 
 
@@ -194,25 +209,24 @@ public class AGHCorner extends AdvancedRobot {
 		}
 		// Przykładowe ustawienie wartości
 		movingDirection.setValue(e.getHeading() - 45.0); // Ustaw wartość bazując na danych z e
-//		speed.setValue(e.getVelocity()); // Ustaw wartość bazując na danych z e
-//		distance.setValue(e.getDistance());
-
+		speed.setValue(Math.abs(e.getVelocity()) / 8); // Ustaw wartość bazując na danych z e
+		distance.setValue(e.getDistance());
 		// Wykonaj obliczenia
 		engine.process();
 
 		// Pobierz wynik i podejmij działanie
 		double direction = shootDirection.getValue();
 		// Użyj wartości kierunek do sterowania strzelaniem
+		if(!Double.isNaN(direction)){
+			double gunHeading = getGunHeading();
 
-		double gunHeading = getGunHeading();
-		double turnGunResult = gunHeading + direction;
+			double o_ile_mozna_w_prawo = 180.0 - gunHeading;
+			double o_ile_mozna_w_lewo = 90.0 - gunHeading;
 
-		double o_ile_mozna_w_prawo = 180.0 - gunHeading;
-		double o_ile_mozna_w_lewo = 90.0 - gunHeading;
-
-		double newDirection = Math.max(o_ile_mozna_w_lewo, Math.min(direction, o_ile_mozna_w_prawo));
+			double newDirection = Math.max(o_ile_mozna_w_lewo, Math.min(direction, o_ile_mozna_w_prawo));
 
 
+//		double turnGunResult = gunHeading + direction;
 //		double newDirection = direction;
 //		if(turnGunResult > 180.0 || turnGunResult < 90.0) {
 //			if(direction >= 0) {
@@ -222,30 +236,33 @@ public class AGHCorner extends AdvancedRobot {
 //			}
 //		}
 
-		turnGunRight(newDirection);
+			turnGunRight(newDirection);
 
-		if (getGunHeading() < 90 || getGunHeading() > 180) {
-			System.out.println(o_ile_mozna_w_prawo + ", " + o_ile_mozna_w_lewo + ", " + gunHeading + ", " + direction + ", " + newDirection);
-		}
+			if (getGunHeading() < 90 || getGunHeading() > 180) {
+				System.out.println(o_ile_mozna_w_prawo + ", " + o_ile_mozna_w_lewo + ", " + gunHeading + ", " + direction + ", " + newDirection);
+			}
 
-		// Should we stop, or just fire?
-		if (stopWhenSeeRobot) {
-			// Stop everything!  You can safely call stop multiple times.
+			// Should we stop, or just fire?
+			if (stopWhenSeeRobot) {
+				// Stop everything!  You can safely call stop multiple times.
 //			stop();
-			// Call our custom firing method
-			smartFire(e.getDistance());
+				// Call our custom firing method
+				smartFire(e.getDistance());
 
-			// Look for another robot.
-			// NOTE:  If you call scan() inside onScannedRobot, and it sees a robot,
-			// the game will interrupt the event handler and start it over
-			scan();
-			// We won't get here if we saw another robot.
-			// Okay, we didn't see another robot... start moving or turning again.
-			resume();
-		} else {
-			smartFire(e.getDistance());
+				// Look for another robot.
+				// NOTE:  If you call scan() inside onScannedRobot, and it sees a robot,
+				// the game will interrupt the event handler and start it over
+				scan();
+				// We won't get here if we saw another robot.
+				// Okay, we didn't see another robot... start moving or turning again.
+				resume();
+			} else {
+				smartFire(e.getDistance());
 
+			}
 		}
+
+
 	}
 
 	/**
