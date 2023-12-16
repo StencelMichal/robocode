@@ -5,7 +5,8 @@ plugins {
 
 dependencies {
     implementation(project(":robocode.api"))
-    implementation(files("../jFuzzyLogic-1.2.1.jar"))
+    implementation("com.fuzzylite:jfuzzylite:6.0.1")
+
 }
 
 repositories{

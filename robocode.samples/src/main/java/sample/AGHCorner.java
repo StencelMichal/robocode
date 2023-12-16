@@ -8,10 +8,24 @@
 package sample;
 
 
-import net.sourceforge.jFuzzyLogic.FIS;
-import net.sourceforge.jFuzzyLogic.rule.FuzzyRuleSet;
+import com.fuzzylite.Engine;
+import com.fuzzylite.activation.General;
+import com.fuzzylite.activation.Highest;
+import com.fuzzylite.activation.Lowest;
+import com.fuzzylite.defuzzifier.Centroid;
+import com.fuzzylite.norm.TNorm;
+import com.fuzzylite.norm.s.DrasticSum;
+import com.fuzzylite.norm.s.Maximum;
+import com.fuzzylite.norm.t.AlgebraicProduct;
+import com.fuzzylite.norm.t.Minimum;
+import com.fuzzylite.rule.Rule;
+import com.fuzzylite.rule.RuleBlock;
+import com.fuzzylite.term.Ramp;
+import com.fuzzylite.term.Triangle;
+import com.fuzzylite.variable.InputVariable;
+import com.fuzzylite.variable.OutputVariable;
+import robocode.AdvancedRobot;
 import robocode.DeathEvent;
-import robocode.Robot;
 import robocode.ScannedRobotEvent;
 
 import java.awt.*;
@@ -27,17 +41,101 @@ import static robocode.util.Utils.normalRelativeAngleDegrees;
  * @author Mathew A. Nelson (original)
  * @author Flemming N. Larsen (contributor)
  */
-public class AGHCorner extends Robot {
+public class AGHCorner extends AdvancedRobot {
 	int others; // Number of other robots in the game
 	static int corner = 0; // Which corner we are currently using
 	// static so that it keeps it between rounds.
 	boolean stopWhenSeeRobot = false; // See goCorner()
-	private FIS fis = FIS.load("AGHCorner.fcl", true);
+	boolean isInCorner = false;
+	boolean isResettingPosition = false;
+
+	private Engine engine;
+	private InputVariable movingDirection;
+	private InputVariable speed;
+	private InputVariable distance;
+	private OutputVariable shootDirection;
+
+	private void initializeFuzzyLogic(){
+		// Inicjalizacja silnika rozmytego
+		engine = new Engine();
+		engine.setName("ShootingDirection");
+
+		// Definicje zmiennych wejściowych
+		movingDirection = new InputVariable();
+		movingDirection.setName("movingDirection");
+		movingDirection.setEnabled(true);
+		movingDirection.setRange(0.0, 360.0);
+		movingDirection.addTerm(new Triangle("movingLeft", -45, 135));
+		movingDirection.addTerm(new Triangle("movingRight", 135, 315));
+		engine.addInputVariable(movingDirection);
+
+
+		speed = new InputVariable();
+		speed.setName("speed");
+		speed.setEnabled(true);
+		speed.setRange(0.0, 8.0);
+		speed.addTerm(new Ramp("movingSlow", 0, 8.0));
+		speed.addTerm(new Ramp("movingFast", 8.0, 0));
+//		engine.addInputVariable(speed);
+
+		distance = new InputVariable();
+		distance.setName("distance");
+		distance.setEnabled(true);
+		distance.setRange(0.0, 1000.0);
+		distance.addTerm(new Ramp("far", 0.0, 1000.0));
+		distance.addTerm(new Ramp("close", 1000.0, 0));
+//		engine.addInputVariable(distance);
+
+		shootDirection = new OutputVariable();
+		shootDirection.setEnabled(true);
+		shootDirection.setName("shootDirection");
+		shootDirection.setRange(-45.0, 45.0);
+		shootDirection.fuzzyOutput().setAggregation(new DrasticSum());
+		shootDirection.setDefuzzifier(new Centroid(90));
+		shootDirection.addTerm(new Ramp("shootRight", 45.0, 0));
+		shootDirection.addTerm(new Ramp("shootLeft", -45.0, 0));
+
+//		hargaLele.setEnabled(true);
+//		hargaLele.setRange(100000,1500000);
+//		hargaLele.setDefaultValue(Double.NaN);
+//		hargaLele.addTerm(new Trapezoid("MURAH",200000,500000));
+//		hargaLele.addTerm(new Triangle("SEDANG",400000,1000000));
+//		hargaLele.addTerm(new Triangle("MAHAL",800000,1500000));
+//		hargaLele.fuzzyOutput().setAccumulation(new DrasticSum());
+//		hargaLele.setDefuzzifier(new Centroid(1500000));
+
+		engine.addOutputVariable(shootDirection);
+
+		// Zasady
+		RuleBlock ruleBlock = new RuleBlock();
+		ruleBlock.setEnabled(true);
+		ruleBlock.setConjunction(null);
+		ruleBlock.setDisjunction(null);
+		ruleBlock.setImplication(new AlgebraicProduct());
+		ruleBlock.setActivation(new General());
+		ruleBlock.addRule(Rule.parse("if movingDirection is movingLeft then shootDirection is shootLeft", engine));
+
+		ruleBlock.addRule(Rule.parse("if movingDirection is movingRight then shootDirection is shootRight", engine));
+//		ruleBlock.addRule(Rule.parse("if movingDirection is movingRight and speed is movingFast and distance is far then shootDirection is shootRight", engine));
+//		ruleBlock.addRule(Rule.parse("if movingDirection is movingLeft and speed is movingFast and distance is far then shootDirection is shootLeft", engine));
+//		ruleBlock.addRule(Rule.parse("if movingDirection is movingRight and speed is movingSlow and distance is close then shootDirection is shootRight", engine));
+//		ruleBlock.addRule(Rule.parse("if movingDirection is movingRight and speed is movingFast and distance is close then shootDirection is shootRight", engine));
+//		ruleBlock.addRule(Rule.parse("if true then shootDirection is shootDefault", engine));
+
+
+
+		// Dodaj więcej zasad...
+
+		// Dodaj zmienne i zasady do silnika
+		engine.addRuleBlock(ruleBlock);
+	}
 
 	/**
 	 * run:  Corners' main run function.
 	 */
 	public void run() {
+
+		initializeFuzzyLogic();
 		// Set colors
 		setBodyColor(Color.BLUE);
 		setGunColor(Color.black);
@@ -59,7 +157,10 @@ public class AGHCorner extends Robot {
 			for (int i = 0; i < 30; i++) {
 				turnGunLeft(gunIncrement);
 			}
-			gunIncrement *= -1;
+//			gunIncrement *= -1;
+			isResettingPosition = true;
+			turnGunRight(Math.abs(180.0 - getGunHeading()));
+			isResettingPosition = false;
 		}
 	}
 
@@ -81,27 +182,59 @@ public class AGHCorner extends Robot {
 		ahead(5000);
 		// Turn gun to starting point
 		turnGunLeft(90);
+		isInCorner = true;
 	}
 
 	/**
 	 * onScannedRobot:  Stop and fire!
 	 */
 	public void onScannedRobot(ScannedRobotEvent e) {
-		FuzzyRuleSet fuzzyRuleSet = fis.getFuzzyRuleSet();
-		fuzzyRuleSet.setVariable("direction", e.getHeading());
-		fuzzyRuleSet.setVariable("velocity", e.getVelocity());
-		fuzzyRuleSet.setVariable("distance", e.getDistance());
-		fuzzyRuleSet.evaluate();
+		if (isInCorner == false || isResettingPosition == true) {
+			return;
+		}
+		// Przykładowe ustawienie wartości
+		movingDirection.setValue(e.getHeading() - 45.0); // Ustaw wartość bazując na danych z e
+//		speed.setValue(e.getVelocity()); // Ustaw wartość bazując na danych z e
+//		distance.setValue(e.getDistance());
 
-		double shootingDirection = fuzzyRuleSet.getVariable("shootingDirection").getValue();
-		System.out.println(shootingDirection);
-		turnGunLeft(shootingDirection);
+		// Wykonaj obliczenia
+		engine.process();
+
+		// Pobierz wynik i podejmij działanie
+		double direction = shootDirection.getValue();
+		// Użyj wartości kierunek do sterowania strzelaniem
+
+		double gunHeading = getGunHeading();
+		double turnGunResult = gunHeading + direction;
+
+		double o_ile_mozna_w_prawo = 180.0 - gunHeading;
+		double o_ile_mozna_w_lewo = 90.0 - gunHeading;
+
+		double newDirection = Math.max(o_ile_mozna_w_lewo, Math.min(direction, o_ile_mozna_w_prawo));
+
+
+//		double newDirection = direction;
+//		if(turnGunResult > 180.0 || turnGunResult < 90.0) {
+//			if(direction >= 0) {
+//				newDirection = direction - (turnGunResult - 180.0);
+//			} else {
+//				newDirection = direction + (90.0 - turnGunResult);
+//			}
+//		}
+
+		turnGunRight(newDirection);
+
+		if (getGunHeading() < 90 || getGunHeading() > 180) {
+			System.out.println(o_ile_mozna_w_prawo + ", " + o_ile_mozna_w_lewo + ", " + gunHeading + ", " + direction + ", " + newDirection);
+		}
+
 		// Should we stop, or just fire?
 		if (stopWhenSeeRobot) {
 			// Stop everything!  You can safely call stop multiple times.
-			stop();
+//			stop();
 			// Call our custom firing method
 			smartFire(e.getDistance());
+
 			// Look for another robot.
 			// NOTE:  If you call scan() inside onScannedRobot, and it sees a robot,
 			// the game will interrupt the event handler and start it over
@@ -111,6 +244,7 @@ public class AGHCorner extends Robot {
 			resume();
 		} else {
 			smartFire(e.getDistance());
+
 		}
 	}
 
@@ -139,14 +273,14 @@ public class AGHCorner extends Robot {
 		}
 
 		// If 75% of the robots are still alive when we die, we'll switch corners.
-		if (getOthers() / (double) others >= .75) {
-			corner += 90;
-			if (corner == 270) {
-				corner = -90;
-			}
-			out.println("I died and did poorly... switching corner to " + corner);
-		} else {
-			out.println("I died but did well.  I will still use corner " + corner);
-		}
+//		if (getOthers() / (double) others >= .75) {
+//			corner += 90;
+//			if (corner == 270) {
+//				corner = -90;
+//			}
+//			out.println("I died and did poorly... switching corner to " + corner);
+//		} else {
+//			out.println("I died but did well.  I will still use corner " + corner);
+//		}
 	}
 }
