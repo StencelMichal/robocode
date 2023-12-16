@@ -11,6 +11,7 @@ import com.fuzzylite.norm.t.Minimum;
 import com.fuzzylite.rule.Rule;
 import com.fuzzylite.rule.RuleBlock;
 import com.fuzzylite.term.Ramp;
+import com.fuzzylite.term.Trapezoid;
 import com.fuzzylite.term.Triangle;
 import com.fuzzylite.variable.InputVariable;
 import com.fuzzylite.variable.OutputVariable;
@@ -38,7 +39,7 @@ public class AGHEnergyManagement extends AdvancedRobot {
         enemyDistance.setEnabled(true);
         enemyDistance.setRange(0, 1000.0);
         enemyDistance.addTerm(new Ramp("close", 0.0, 400.0));
-        enemyDistance.addTerm(new Ramp("far", 1000.0, 200.0));
+        enemyDistance.addTerm(new Trapezoid("far", 1000, 999, 500, 200));
         engine.addInputVariable(enemyDistance);
 
 
@@ -56,8 +57,8 @@ public class AGHEnergyManagement extends AdvancedRobot {
         shootEnergy.setRange(1, Rules.MAX_BULLET_POWER);
         shootEnergy.fuzzyOutput().setAggregation(new DrasticSum());
         shootEnergy.setDefuzzifier(new WeightedAverage());
-        shootEnergy.addTerm(new Ramp("shootLowEnergy", 0.0, Rules.MAX_BULLET_POWER));
-        shootEnergy.addTerm(new Ramp("shootHighEnergy", Rules.MAX_BULLET_POWER, 0));
+        shootEnergy.addTerm(new Ramp("shootLowEnergy",  1.0, Rules.MAX_BULLET_POWER));
+        shootEnergy.addTerm(new Trapezoid("shootHighEnergy", Rules.MAX_BULLET_POWER, Rules.MAX_BULLET_POWER, 2.0, 1.0));
 
         engine.addOutputVariable(shootEnergy);
 
@@ -145,10 +146,9 @@ public class AGHEnergyManagement extends AdvancedRobot {
 
         double calculatedShootEnergy = shootEnergy.getValue();
         if(!Double.isNaN(calculatedShootEnergy)){
-            fire(calculatedShootEnergy);
+            fire(3-calculatedShootEnergy);
         }
         else {
-            System.out.println("dupa");
             fire(1);
         }
     }
